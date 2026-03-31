@@ -206,7 +206,21 @@ class Orchestrator:
                 f"{key}_agent",
                 "attempt",
                 "Agent execution completed",
-                {"retry_count": state.retries[key], "reasons": reasons, "score": envelope.rubric.score},
+                {
+                    "task": {
+                        "title": task.title,
+                        "prompt": task.prompt,
+                        "desired_outputs": task.desired_outputs,
+                    },
+                    "payload": envelope.payload,
+                    "artifacts": [artifact.model_dump() for artifact in envelope.artifacts],
+                    "citations": [citation.model_dump() for citation in envelope.citations],
+                    "rubric": envelope.rubric.model_dump(),
+                    "errors": [error.model_dump() for error in envelope.errors],
+                    "retry_count": state.retries[key],
+                    "reasons": reasons,
+                    "score": envelope.rubric.score,
+                },
             )
             if done:
                 if reasons:

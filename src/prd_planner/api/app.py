@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=Path(".env"), override=False)
@@ -17,6 +18,16 @@ from prd_planner.storage.sqlite_store import SQLiteStore
 store = SQLiteStore(settings.db_path)
 orchestrator = Orchestrator(store=store, model_registry=ModelRegistry())
 app = FastAPI(title="PRD Planner PoC", version="0.1.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/")

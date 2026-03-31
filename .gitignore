@@ -29,3 +29,9 @@ dist/
 .codex
 
 .codex
+
+
+node_modules/
+dist/
+*.log
+*.lock
