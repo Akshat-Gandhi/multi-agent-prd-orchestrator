@@ -4,7 +4,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from prd_planner.contracts.schemas import EventRecord, RunRecord, RunResponse
+from prd_planner.contracts.schemas import EventRecord, RunRecord, RunResponse, RunStatusResponse
 
 
 class SQLiteStore:
@@ -71,6 +71,16 @@ class SQLiteStore:
         if not row or not row[0]:
             return None
         return RunResponse.model_validate_json(row[0])
+
+    def get_run_status(self, run_id: str) -> RunStatusResponse | None:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT run_id, trace_id, status FROM runs WHERE run_id=?",
+                (run_id,),
+            ).fetchone()
+        if not row:
+            return None
+        return RunStatusResponse(run_id=row[0], trace_id=row[1], status=row[2])
 
     def save_event(self, event: EventRecord) -> None:
         with self._conn() as conn:

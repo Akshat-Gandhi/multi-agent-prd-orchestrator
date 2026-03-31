@@ -78,6 +78,7 @@ class Orchestrator:
                 "provider_source": planner_source,
                 "latency_ms": elapsed_ms,
                 "output_chars": len(prefix),
+                "output_text": prefix,
                 "output_preview": prefix[: self.llm_trace_preview_chars],
             }
         domain = req.domain or "general"
@@ -116,6 +117,9 @@ class Orchestrator:
 
     def run(self, request: RunRequest) -> RunResponse:
         run = RunRecord(request=request)
+        return self.run_from_record(run)
+
+    def run_from_record(self, run: RunRecord) -> RunResponse:
         state = OrchestratorState(run=run)
         self.store.save_run(run)
 
@@ -285,6 +289,7 @@ class Orchestrator:
                 event_data["llm_trace"] = {
                     "model": model_name,
                     "output_chars": len(raw),
+                    "output_text": raw,
                     "output_preview": raw[: self.llm_trace_preview_chars],
                 }
             self._persist_event(state, "orchestrator", "synthesize_plan", "complete", "Execution plan synthesized", event_data)
@@ -311,6 +316,7 @@ class Orchestrator:
                     event_data["llm_trace"] = {
                         "model": model_name,
                         "output_chars": len(repaired_raw),
+                        "output_text": repaired_raw,
                         "output_preview": repaired_raw[: self.llm_trace_preview_chars],
                     }
                 self._persist_event(
@@ -333,7 +339,9 @@ class Orchestrator:
                         "error": str(retry_exc),
                         "first_error": str(exc),
                         "latency_ms": elapsed_ms + retry_elapsed_ms,
+                        "raw_text": raw,
                         "raw_preview": raw[:200],
+                        "retry_raw_text": repaired_raw,
                         "retry_raw_preview": repaired_raw[:200],
                     },
                 )

@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+import asyncio
+from threading import Thread
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=Path(".env"), override=False)
 
 from prd_planner.config.settings import settings
-from prd_planner.contracts.schemas import RunRequest, RunResponse
+from prd_planner.contracts.schemas import RunLaunchResponse, RunRecord, RunRequest, RunResponse, RunStatusResponse
 from prd_planner.graph.orchestrator import Orchestrator
 from prd_planner.models.provider import ModelRegistry
 from prd_planner.storage.sqlite_store import SQLiteStore
@@ -57,6 +59,17 @@ def create_run(request: RunRequest) -> RunResponse:
     return orchestrator.run(request)
 
 
+@app.post("/runs/launch", response_model=RunLaunchResponse)
+def launch_run(request: RunRequest) -> RunLaunchResponse:
+    run = RunRecord(request=request)
+    store.save_run(run)
+
+    worker = Thread(target=orchestrator.run_from_record, args=(run,), daemon=True)
+    worker.start()
+
+    return RunLaunchResponse(run_id=run.run_id, trace_id=run.trace_id)
+
+
 @app.get("/runs/{run_id}", response_model=RunResponse)
 def get_run(run_id: str) -> RunResponse:
     run = store.get_run(run_id)
@@ -65,6 +78,56 @@ def get_run(run_id: str) -> RunResponse:
     return run
 
 
+@app.get("/runs/{run_id}/status", response_model=RunStatusResponse)
+def get_run_status(run_id: str) -> RunStatusResponse:
+    status = store.get_run_status(run_id)
+    if not status:
+        raise HTTPException(status_code=404, detail="run not found")
+    return status
+
+
 @app.get("/runs/{run_id}/events")
 def get_events(run_id: str) -> list[dict]:
     return [e.model_dump() for e in store.get_events(run_id)]
+
+
+@app.websocket("/ws/runs/{run_id}")
+async def run_updates(websocket: WebSocket, run_id: str) -> None:
+    await websocket.accept()
+    sent_count = 0
+    try:
+        while True:
+            status = store.get_run_status(run_id)
+            if status is None:
+                await websocket.send_json({"type": "error", "message": "run not found"})
+                return
+
+            events = store.get_events(run_id)
+            if sent_count == 0:
+                await websocket.send_json(
+                    {
+                        "type": "snapshot",
+                        "status": status.model_dump(),
+                        "events": [event.model_dump() for event in events],
+                    }
+                )
+                sent_count = len(events)
+            elif len(events) > sent_count:
+                for event in events[sent_count:]:
+                    await websocket.send_json({"type": "event", "event": event.model_dump()})
+                sent_count = len(events)
+
+            if status.status != "running":
+                run = store.get_run(run_id)
+                await websocket.send_json(
+                    {
+                        "type": "completed",
+                        "status": status.model_dump(),
+                        "run": run.model_dump() if run else None,
+                    }
+                )
+                return
+
+            await asyncio.sleep(0.6)
+    except WebSocketDisconnect:
+        return

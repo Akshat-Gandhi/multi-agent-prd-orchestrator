@@ -80,6 +80,18 @@ class RunResponse(BaseModel):
     citations: list[Citation] = Field(default_factory=list)
 
 
+class RunLaunchResponse(BaseModel):
+    run_id: str
+    trace_id: str
+    status: Literal["running"] = "running"
+
+
+class RunStatusResponse(BaseModel):
+    run_id: str
+    trace_id: str
+    status: Literal["running", "success", "degraded", "failed"]
+
+
 class RunRecord(BaseModel):
     run_id: str = Field(default_factory=lambda: str(uuid4()))
     trace_id: str = Field(default_factory=lambda: str(uuid4()))

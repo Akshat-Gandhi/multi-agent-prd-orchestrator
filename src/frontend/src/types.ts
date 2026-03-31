@@ -1,4 +1,4 @@
-export type RunStatus = "success" | "degraded" | "failed";
+export type RunStatus = "running" | "success" | "degraded" | "failed";
 
 export interface Citation {
   title: string;
@@ -23,11 +23,23 @@ export interface ExecutionPlan {
 export interface RunResponse {
   run_id: string;
   trace_id: string;
-  status: RunStatus;
+  status: Exclude<RunStatus, "running">;
   execution_plan: ExecutionPlan | null;
   agent_scores: Record<string, number>;
   unresolved_risks: string[];
   citations: Citation[];
+}
+
+export interface RunLaunchResponse {
+  run_id: string;
+  trace_id: string;
+  status: "running";
+}
+
+export interface RunStatusResponse {
+  run_id: string;
+  trace_id: string;
+  status: RunStatus;
 }
 
 export interface EventRecord {
@@ -46,3 +58,27 @@ export interface RunRequestPayload {
   domain?: string;
   constraints?: string[];
 }
+
+export interface RunEventMessage {
+  type: "event";
+  event: EventRecord;
+}
+
+export interface RunSnapshotMessage {
+  type: "snapshot";
+  status: RunStatusResponse;
+  events: EventRecord[];
+}
+
+export interface RunCompletedMessage {
+  type: "completed";
+  status: RunStatusResponse;
+  run: RunResponse | null;
+}
+
+export interface RunErrorMessage {
+  type: "error";
+  message: string;
+}
+
+export type RunStreamMessage = RunEventMessage | RunSnapshotMessage | RunCompletedMessage | RunErrorMessage;
