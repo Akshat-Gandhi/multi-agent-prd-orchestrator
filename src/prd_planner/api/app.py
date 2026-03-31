@@ -55,6 +55,14 @@ def root() -> dict:
     }
 
 
+@app.get("/health")
+def health() -> dict:
+    return {
+        "status": "ok",
+        "service": "prd-planner-poc",
+    }
+
+
 @app.post("/runs", response_model=RunResponse)
 def create_run(request: RunRequest) -> RunResponse:
     return orchestrator.run(request)
