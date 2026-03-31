@@ -64,18 +64,13 @@ class DummyExaMCPClient:
     def search(self, query: str, limit: int = 5) -> list[Citation]:
         if self.should_fail:
             raise RuntimeError("MCP unavailable")
-        return [
-            Citation(title="Market report", url="https://example.com/market", snippet=f"MCP result for {query}"),
-            Citation(title="Trend brief", url="https://example.com/trends", snippet="Macro trend signal"),
-        ][:limit]
+        return []
 
 
 @dataclass
 class DummyExaAPIClient:
     def search(self, query: str, limit: int = 5) -> list[Citation]:
-        return [
-            Citation(title="API backup insight", url="https://example.com/api", snippet=f"API result for {query}"),
-        ][:limit]
+        return []
 
 
 @dataclass

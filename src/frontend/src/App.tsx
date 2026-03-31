@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
-  Bot,
+  ArrowRight,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
   ExternalLink,
   Loader2,
   Radio,
   RefreshCw,
   Search,
-  Sparkles,
+  X,
   Workflow
 } from "lucide-react";
 
@@ -74,204 +75,10 @@ Success metrics:
 - Increase visibility into customer pain points and competitor activity
 `;
 
-const DEMO_RUN: RunResponse = {
-  run_id: "demo-run-live",
-  trace_id: "demo-trace-live",
-  status: "success",
-  execution_plan: {
-    summary:
-      "Launch a staged agent console that shows orchestration progress first, exposes each agent's task, reasoning, and output second, and presents the final report only after completion.",
-    milestones: [
-      {
-        name: "Live run channel",
-        description: "Stream orchestration events to the client while the run is active.",
-        owner: "Backend + Frontend",
-        eta_days: 2
-      },
-      {
-        name: "Agent accordions",
-        description: "Expose each agent's input, reasoning log, and output in a focused expandable panel.",
-        owner: "Frontend",
-        eta_days: 2
-      }
-    ],
-    risks: ["Tool outputs vary by provider availability."],
-    dependencies: ["FastAPI websocket", "SQLite event log"]
-  },
-  agent_scores: {
-    market_agent: 86,
-    competitor_agent: 79,
-    browser_agent: 85
-  },
-  unresolved_risks: ["Live streaming currently polls the event store."],
-  citations: [
-    {
-      title: "Example market evidence",
-      url: "https://example.com/market",
-      snippet: "Transparent orchestration improves user trust."
-    }
-  ]
-};
-
-const DEMO_STATUS: RunStatusResponse = {
-  run_id: DEMO_RUN.run_id,
-  trace_id: DEMO_RUN.trace_id,
-  status: "success"
-};
-
-const DEMO_EVENTS: EventRecord[] = [
-  {
-    run_id: DEMO_RUN.run_id,
-    trace_id: DEMO_RUN.trace_id,
-    agent_id: "orchestrator",
-    step: "ingest_prd",
-    event_type: "start",
-    message: "PRD accepted by orchestrator.",
-    data: { request_summary: "Create a live orchestration console for product planning." },
-    created_at: "2026-03-31T09:30:00.000Z"
-  },
-  {
-    run_id: DEMO_RUN.run_id,
-    trace_id: DEMO_RUN.trace_id,
-    agent_id: "orchestrator",
-    step: "plan_research_tasks",
-    event_type: "complete",
-    message: "Tasks prepared for agents.",
-    data: {
-      llm_trace: {
-        output_preview: "Break the request into market demand, competitor research, browser evidence, and synthesis."
-      }
-    },
-    created_at: "2026-03-31T09:30:03.000Z"
-  },
-  {
-    run_id: DEMO_RUN.run_id,
-    trace_id: DEMO_RUN.trace_id,
-    agent_id: "market_agent",
-    step: "market_agent",
-    event_type: "attempt",
-    message: "Market scan complete.",
-    data: {
-      task: {
-        title: "Market scan",
-        prompt: "Analyze market trends for conversation intelligence.",
-        desired_outputs: ["market segments", "trends", "adoption signals"]
-      },
-      payload: {
-        market_summary: "Conversation intelligence remains strong in B2B SaaS, especially around manager visibility and CRM hygiene.",
-        coverage: 92,
-        source: "exa"
-      },
-      citations: [
-        {
-          title: "Example market evidence",
-          url: "https://example.com/market",
-          snippet: "Managers want call visibility and automated note capture."
-        }
-      ],
-      rubric: {
-        score: 86,
-        passed: true,
-        unmet_criteria: [],
-        notes: "source=exa"
-      },
-      llm_trace: {
-        output_preview: "The market is validated by demand for meeting capture, pipeline visibility, and post-call workflow automation."
-      }
-    },
-    created_at: "2026-03-31T09:30:10.000Z"
-  },
-  {
-    run_id: DEMO_RUN.run_id,
-    trace_id: DEMO_RUN.trace_id,
-    agent_id: "competitor_agent",
-    step: "competitor_agent",
-    event_type: "attempt",
-    message: "Competitor scan complete.",
-    data: {
-      task: {
-        title: "Competitor analysis",
-        prompt: "Identify competitors and positioning for conversation intelligence.",
-        desired_outputs: ["competitor list", "pricing", "feature matrix"]
-      },
-      payload: {
-        competitors: [
-          { name: "Gong", positioning: "Enterprise revenue intelligence", pricing: "Custom" },
-          { name: "Avoma", positioning: "Meeting assistant for mid-market", pricing: "Tiered" }
-        ],
-        comparison_confidence: 79
-      },
-      rubric: {
-        score: 79,
-        passed: true,
-        unmet_criteria: [],
-        notes: "source=exa"
-      },
-      llm_trace: {
-        output_preview: "Competitive differentiation likely depends on simpler CRM sync, lower price, and product-facing insights."
-      }
-    },
-    created_at: "2026-03-31T09:30:19.000Z"
-  },
-  {
-    run_id: DEMO_RUN.run_id,
-    trace_id: DEMO_RUN.trace_id,
-    agent_id: "browser_agent",
-    step: "browser_agent",
-    event_type: "attempt",
-    message: "Browser evidence captured.",
-    data: {
-      task: {
-        title: "Browser evidence",
-        prompt: "Open pages and capture public evidence for competitors.",
-        desired_outputs: ["facts", "supporting snippets"]
-      },
-      payload: {
-        url: "https://example.com",
-        facts: ["Public positioning emphasizes visibility and coaching.", "CRM sync is framed as a core workflow."]
-      },
-      rubric: {
-        score: 85,
-        passed: true,
-        unmet_criteria: [],
-        notes: "playwright_mcp_open_extract_close"
-      },
-      llm_trace: {
-        output_preview: "Public competitor pages consistently stress visibility, automation, and team coaching."
-      }
-    },
-    created_at: "2026-03-31T09:30:28.000Z"
-  },
-  {
-    run_id: DEMO_RUN.run_id,
-    trace_id: DEMO_RUN.trace_id,
-    agent_id: "orchestrator",
-    step: "synthesize_plan",
-    event_type: "complete",
-    message: "Execution plan synthesized.",
-    data: {
-      llm_trace: {
-        output_preview: "Combine the evidence into a concise launch plan with milestones, dependencies, and risks."
-      }
-    },
-    created_at: "2026-03-31T09:30:35.000Z"
-  },
-  {
-    run_id: DEMO_RUN.run_id,
-    trace_id: DEMO_RUN.trace_id,
-    agent_id: "orchestrator",
-    step: "finalize",
-    event_type: "complete",
-    message: "Run finalized.",
-    data: { status: "success" },
-    created_at: "2026-03-31T09:30:39.000Z"
-  }
-];
-
 type Route =
   | { page: "home" }
-  | { page: "run"; runId: string; source: "live" | "demo" }
-  | { page: "report"; runId: string; source: "live" | "demo" };
+  | { page: "run"; runId: string }
+  | { page: "report"; runId: string };
 
 function parseHash(hash: string): Route {
   if (!hash || hash === "#" || hash === "#/") {
@@ -279,15 +86,13 @@ function parseHash(hash: string): Route {
   }
 
   const normalized = hash.replace(/^#/, "");
-  const [path, queryString] = normalized.split("?");
+  const [path] = normalized.split("?");
   const parts = path.split("/").filter(Boolean);
   if (parts[0] === "runs" && parts[1]) {
-    const params = new URLSearchParams(queryString || "");
-    const source = params.get("source") === "demo" ? "demo" : "live";
     if (parts[2] === "report") {
-      return { page: "report", runId: decodeURIComponent(parts[1]), source };
+      return { page: "report", runId: decodeURIComponent(parts[1]) };
     }
-    return { page: "run", runId: decodeURIComponent(parts[1]), source };
+    return { page: "run", runId: decodeURIComponent(parts[1]) };
   }
 
   return { page: "home" };
@@ -298,12 +103,11 @@ function navigate(route: Route) {
     window.location.hash = "/";
     return;
   }
-  const suffix = route.source === "demo" ? "?source=demo" : "";
   if (route.page === "report") {
-    window.location.hash = `/runs/${encodeURIComponent(route.runId)}/report${suffix}`;
+    window.location.hash = `/runs/${encodeURIComponent(route.runId)}/report`;
     return;
   }
-  window.location.hash = `/runs/${encodeURIComponent(route.runId)}${suffix}`;
+  window.location.hash = `/runs/${encodeURIComponent(route.runId)}`;
 }
 
 function toWebSocketUrl(runId: string) {
@@ -337,6 +141,7 @@ function stringifyValue(value: unknown) {
 function extractPreview(event: EventRecord) {
   const llmTrace = event.data.llm_trace as Record<string, unknown> | undefined;
   const preview =
+    event.data.user_preview ??
     llmTrace?.output_text ??
     llmTrace?.output_preview ??
     event.data.raw_text ??
@@ -357,6 +162,10 @@ function asStringArray(value: unknown): string[] {
 function summarizeStepForUser(event?: EventRecord) {
   if (!event) {
     return "Waiting to start.";
+  }
+
+  if (typeof event.data.user_preview === "string" && event.data.user_preview.trim()) {
+    return event.data.user_preview;
   }
 
   if (event.step === "ingest_prd") {
@@ -559,6 +368,95 @@ function summarizeStepDetails(event?: EventRecord) {
   return lines.slice(0, 4);
 }
 
+function buildHighlightLines(event?: EventRecord) {
+  if (!event) {
+    return ["We have not collected any takeaways for this step yet."];
+  }
+
+  const payload = asRecord(event.data.payload);
+  const task = asRecord(event.data.task);
+  const lines: string[] = [];
+
+  if (task && typeof task.title === "string") {
+    lines.push(`Focus area: ${task.title}.`);
+  }
+
+  if (payload) {
+    if (typeof payload.market_summary === "string") {
+      lines.push(payload.market_summary);
+    }
+    const competitors = Array.isArray(payload.competitors) ? payload.competitors : [];
+    if (competitors.length > 0) {
+      const names = competitors
+        .map((item) => asRecord(item)?.name)
+        .filter((item): item is string => typeof item === "string");
+      if (names.length > 0) {
+        lines.push(`Products reviewed: ${names.join(", ")}.`);
+      }
+    }
+    const facts = asStringArray(payload.facts);
+    if (facts.length > 0) {
+      lines.push(`Key evidence: ${facts[0]}`);
+    }
+    if (typeof payload.url === "string" && payload.url.trim()) {
+      lines.push(`Source checked: ${payload.url}`);
+    }
+  }
+
+  if (typeof event.data.overall === "string") {
+    lines.push(`Result: ${event.data.overall}.`);
+  }
+
+  if (lines.length === 0) {
+    lines.push("This step is in progress and more details will appear soon.");
+  }
+
+  return lines.slice(0, 4);
+}
+
+function buildActivityLines(events: EventRecord[]) {
+  if (events.length === 0) {
+    return ["This step has not started yet."];
+  }
+
+  return events.map((event) => {
+    const statusLabel =
+      event.event_type === "start"
+        ? "Started"
+        : event.event_type === "complete"
+          ? "Completed"
+          : event.event_type === "attempt"
+            ? "Updated"
+            : event.event_type === "error"
+              ? "Needs attention"
+              : "Updated";
+
+    return `${formatTimestamp(event.created_at)} • ${statusLabel}`;
+  });
+}
+
+function buildDetailedPreview(event?: EventRecord) {
+  if (!event) {
+    return "Nothing to preview yet.";
+  }
+
+  const llmTrace = asRecord(event.data.llm_trace);
+  if (typeof llmTrace?.output_text === "string" && llmTrace.output_text.trim()) {
+    return llmTrace.output_text;
+  }
+
+  if (typeof event.data.user_preview === "string" && event.data.user_preview.trim()) {
+    return event.data.user_preview;
+  }
+
+  const payload = asRecord(event.data.payload);
+  if (payload) {
+    return stringifyValue(payload);
+  }
+
+  return extractPreview(event);
+}
+
 function App() {
   const [route, setRoute] = useState<Route>(() => parseHash(window.location.hash));
   const [prdText, setPrdText] = useState(SAMPLE_PRD);
@@ -599,7 +497,7 @@ function App() {
 
       const run = (await response.json()) as RunLaunchResponse;
       setRunIdInput(run.run_id);
-      navigate({ page: "run", runId: run.run_id, source: "live" });
+      navigate({ page: "run", runId: run.run_id });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to launch run");
     } finally {
@@ -614,7 +512,7 @@ function App() {
       return;
     }
     setError(null);
-    navigate({ page: "run", runId: trimmed, source: "live" });
+    navigate({ page: "run", runId: trimmed });
   }
 
   return (
@@ -647,10 +545,9 @@ function App() {
             onRunIdChange={setRunIdInput}
             onSubmit={submitRun}
             onOpenRun={openRun}
-            onOpenDemo={() => navigate({ page: "run", runId: DEMO_RUN.run_id, source: "demo" })}
           />
         ) : route.page === "report" ? (
-          <ReportScreen route={route} onBack={() => navigate({ page: "run", runId: route.runId, source: route.source })} />
+          <ReportScreen route={route} onBack={() => navigate({ page: "run", runId: route.runId })} />
         ) : (
           <RunScreen
             route={route}
@@ -672,7 +569,6 @@ type HomeScreenProps = {
   onRunIdChange: (value: string) => void;
   onSubmit: () => void;
   onOpenRun: () => void;
-  onOpenDemo: () => void;
 };
 
 function HomeScreen(props: HomeScreenProps) {
@@ -732,48 +628,22 @@ function HomeScreen(props: HomeScreenProps) {
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200 bg-white shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg">See an example</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Button variant="outline" className="w-full" onClick={props.onOpenDemo}>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Open Example
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
 }
 
 function RunScreen({ route, onBack }: { route: Extract<Route, { page: "run" }>; onBack: () => void }) {
-  const [status, setStatus] = useState<RunStatusResponse | null>(route.source === "demo" ? DEMO_STATUS : null);
-  const [run, setRun] = useState<RunResponse | null>(route.source === "demo" ? DEMO_RUN : null);
-  const [events, setEvents] = useState<EventRecord[]>(route.source === "demo" ? DEMO_EVENTS : []);
-  const [loading, setLoading] = useState(route.source === "live");
-  const [connectionState, setConnectionState] = useState<"connecting" | "live" | "closed" | "error">(
-    route.source === "demo" ? "closed" : "connecting"
-  );
+  const [status, setStatus] = useState<RunStatusResponse | null>(null);
+  const [run, setRun] = useState<RunResponse | null>(null);
+  const [events, setEvents] = useState<EventRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [connectionState, setConnectionState] = useState<"connecting" | "live" | "closed" | "error">("connecting");
   const [error, setError] = useState<string | null>(null);
-  const [openAgents, setOpenAgents] = useState<Record<string, boolean>>({
-    ingest_prd: true,
-    plan_research_tasks: true,
-    market_agent: true,
-    competitor_agent: false,
-    browser_agent: false,
-    synthesize_plan: false,
-    quality_gate: false,
-    finalize: false
-  });
+  const [selectedStep, setSelectedStep] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
 
   const refreshRun = useCallback(async () => {
-    if (route.source !== "live") {
-      return;
-    }
-
     setError(null);
     try {
       const [statusRes, eventsRes] = await Promise.all([
@@ -808,20 +678,12 @@ function RunScreen({ route, onBack }: { route: Extract<Route, { page: "run" }>; 
 
   useEffect(() => {
     setError(null);
-    if (route.source === "demo") {
-      setStatus(DEMO_STATUS);
-      setRun(DEMO_RUN);
-      setEvents(DEMO_EVENTS);
-      setLoading(false);
-      setConnectionState("closed");
-      return;
-    }
-
     setStatus(null);
     setRun(null);
     setEvents([]);
     setLoading(true);
     setConnectionState("connecting");
+    setSelectedStep(null);
 
     const socket = new WebSocket(toWebSocketUrl(route.runId));
     socketRef.current = socket;
@@ -875,13 +737,11 @@ function RunScreen({ route, onBack }: { route: Extract<Route, { page: "run" }>; 
       socket.close();
       socketRef.current = null;
     };
-  }, [route]);
+  }, [route.runId]);
 
   useEffect(() => {
-    if (route.source !== "live" || status?.status !== "running") {
-      if (!(route.source === "live" && loading)) {
-        return;
-      }
+    if (status?.status !== "running" && !loading) {
+      return;
     }
 
     void refreshRun();
@@ -891,7 +751,7 @@ function RunScreen({ route, onBack }: { route: Extract<Route, { page: "run" }>; 
     }, 5000);
 
     return () => window.clearInterval(intervalId);
-  }, [refreshRun, route.source, status?.status, loading]);
+  }, [refreshRun, status?.status, loading]);
 
   const flowSteps = useMemo(
     () =>
@@ -912,22 +772,36 @@ function RunScreen({ route, onBack }: { route: Extract<Route, { page: "run" }>; 
     return events[events.length - 1]?.step ?? null;
   }, [events, loading, run]);
 
-  const nodeGroups = useMemo(() => {
-    const order = FLOW_STEPS.map((item) => item.step);
-    return order
-      .map((stepId) => ({
-        stepId,
-        config: FLOW_STEPS.find((item) => item.step === stepId)!,
-        events: events.filter((event) => event.step === stepId)
-      }))
-      .filter((group) => group.events.length > 0 || group.stepId === "ingest_prd");
-  }, [events]);
+  const selectedStepIndex = useMemo(
+    () => FLOW_STEPS.findIndex((item) => item.step === selectedStep),
+    [selectedStep]
+  );
+  const selectedStepEvent = useMemo(
+    () => (selectedStep ? events.filter((event) => event.step === selectedStep).slice(-1)[0] : undefined),
+    [events, selectedStep]
+  );
+  const selectedStepTimeline = useMemo(
+    () => (selectedStep ? events.filter((event) => event.step === selectedStep) : []),
+    [events, selectedStep]
+  );
+  const selectedStepLabel = useMemo(
+    () => FLOW_STEPS.find((item) => item.step === selectedStep)?.label ?? "",
+    [selectedStep]
+  );
 
-  function toggleAgent(agentId: string) {
-    setOpenAgents((current) => ({
-      ...current,
-      [agentId]: !current[agentId]
-    }));
+  function openStep(stepId: string) {
+    setSelectedStep(stepId);
+  }
+
+  function closeStep() {
+    setSelectedStep(null);
+  }
+
+  function moveStep(direction: -1 | 1) {
+    if (selectedStepIndex < 0) return;
+    const nextIndex = selectedStepIndex + direction;
+    if (nextIndex < 0 || nextIndex >= FLOW_STEPS.length) return;
+    setSelectedStep(FLOW_STEPS[nextIndex].step);
   }
 
   return (
@@ -939,18 +813,13 @@ function RunScreen({ route, onBack }: { route: Extract<Route, { page: "run" }>; 
             Back
           </Button>
           <div>
-            <p className="text-xs uppercase tracking-[0.22em] text-slate-500">{route.source === "demo" ? "Demo run" : "Live run"}</p>
+            <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Plan in progress</p>
             <h2 className="font-mono text-sm text-slate-900">{route.runId}</h2>
           </div>
         </div>
         <div className="flex items-center gap-3">
           {statusBadge(status?.status)}
-          {route.source === "live" ? (
-            <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-600">
-              {connectionState}
-            </Badge>
-          ) : null}
-          <Button variant="secondary" onClick={() => navigate({ page: "report", runId: route.runId, source: route.source })} disabled={!run}>
+          <Button variant="secondary" onClick={() => navigate({ page: "report", runId: route.runId })} disabled={!run}>
             Open Report
           </Button>
           <Button variant="outline" onClick={refreshRun}>
@@ -1011,7 +880,6 @@ function RunScreen({ route, onBack }: { route: Extract<Route, { page: "run" }>; 
           {flowSteps.map((item) => {
             const isDone = Boolean(item.event);
             const isCurrent = activeStep === item.step && !run;
-            const isOpen = Boolean(openAgents[item.step]);
             return (
               <Card
                 key={item.step}
@@ -1022,7 +890,7 @@ function RunScreen({ route, onBack }: { route: Extract<Route, { page: "run" }>; 
                   !isDone && !isCurrent && "border-slate-200 bg-white"
                 )}
               >
-                <button type="button" className="w-full text-left" onClick={() => toggleAgent(item.step)}>
+                <button type="button" className="w-full text-left" onClick={() => openStep(item.step)}>
                   <CardContent className="p-4">
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <p className="text-sm font-medium text-slate-900">{item.label}</p>
@@ -1034,7 +902,7 @@ function RunScreen({ route, onBack }: { route: Extract<Route, { page: "run" }>; 
                         ) : (
                           <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
                         )}
-                        <ChevronDown className={cn("h-4 w-4 text-slate-400 transition-transform", isOpen && "rotate-180")} />
+                        <ChevronDown className="h-4 w-4 text-slate-400" />
                       </div>
                     </div>
                     <p className="text-xs leading-6 text-slate-500">
@@ -1042,15 +910,6 @@ function RunScreen({ route, onBack }: { route: Extract<Route, { page: "run" }>; 
                     </p>
                   </CardContent>
                 </button>
-                {isOpen ? (
-                  <div className="border-t border-slate-100 bg-white/70 px-4 py-4">
-                    <div className="space-y-2 text-sm leading-7 text-slate-700">
-                      {summarizeStepDetails(item.event).map((line) => (
-                        <p key={line}>{line}</p>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
               </Card>
             );
           })}
@@ -1080,30 +939,71 @@ function RunScreen({ route, onBack }: { route: Extract<Route, { page: "run" }>; 
                 <p className="text-base font-medium text-slate-900">Your final plan is ready</p>
                 <p className="mt-1 text-sm text-slate-600">Open the report page to review the full recommendation and sources.</p>
               </div>
-              <Button onClick={() => navigate({ page: "report", runId: route.runId, source: route.source })}>Open Final Plan</Button>
+              <Button onClick={() => navigate({ page: "report", runId: route.runId })}>Open Final Plan</Button>
             </CardContent>
           </Card>
         )}
       </section>
+
+      {selectedStep ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-8">
+          <div className="relative flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.22)]">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Step details</p>
+                <h3 className="mt-1 text-xl font-semibold tracking-[-0.03em] text-slate-950">{selectedStepLabel}</h3>
+              </div>
+              <button type="button" className="rounded-full p-2 text-slate-500 hover:bg-slate-100" onClick={closeStep}>
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid flex-1 gap-6 overflow-y-auto px-6 py-6 lg:grid-cols-[0.9fr_1.1fr]">
+              <div className="space-y-4">
+                <NarrativePanel title="What is happening" lines={summarizeStepDetails(selectedStepEvent)} />
+                <NarrativePanel
+                  title="Timeline"
+                  lines={
+                    buildActivityLines(selectedStepTimeline)
+                  }
+                />
+              </div>
+
+              <div className="space-y-4">
+                <NarrativePanel title="Key takeaways" lines={buildHighlightLines(selectedStepEvent)} />
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="mb-3 text-sm font-medium text-slate-900">Detailed notes</p>
+                  <div className="max-h-[320px] overflow-auto rounded-2xl bg-slate-50 p-4 text-sm leading-7 text-slate-700 whitespace-pre-wrap">
+                    {buildDetailedPreview(selectedStepEvent)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-slate-200 px-6 py-4">
+              <Button variant="outline" onClick={() => moveStep(-1)} disabled={selectedStepIndex <= 0}>
+                <ChevronLeft className="mr-2 h-4 w-4" />
+                Previous
+              </Button>
+              <Button variant="outline" onClick={() => moveStep(1)} disabled={selectedStepIndex < 0 || selectedStepIndex >= FLOW_STEPS.length - 1}>
+                Next
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
 function ReportScreen({ route, onBack }: { route: Extract<Route, { page: "report" }>; onBack: () => void }) {
-  const [run, setRun] = useState<RunResponse | null>(route.source === "demo" ? DEMO_RUN : null);
-  const [status, setStatus] = useState<RunStatusResponse | null>(route.source === "demo" ? DEMO_STATUS : null);
-  const [loading, setLoading] = useState(route.source === "live");
+  const [run, setRun] = useState<RunResponse | null>(null);
+  const [status, setStatus] = useState<RunStatusResponse | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (route.source === "demo") {
-      setRun(DEMO_RUN);
-      setStatus(DEMO_STATUS);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
     let cancelled = false;
 
     async function loadReport() {
@@ -1150,7 +1050,7 @@ function ReportScreen({ route, onBack }: { route: Extract<Route, { page: "report
     return () => {
       cancelled = true;
     };
-  }, [route]);
+  }, [route.runId]);
 
   return (
     <div className="space-y-6">
@@ -1192,6 +1092,14 @@ function ReportScreen({ route, onBack }: { route: Extract<Route, { page: "report
               <CardDescription>Your final recommendation based on the research and analysis.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="mb-2 text-xs uppercase tracking-[0.18em] text-slate-500">Intent</p>
+                <p className="text-sm leading-7 text-slate-700">{run.execution_plan?.intent ?? "No intent available."}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="mb-2 text-xs uppercase tracking-[0.18em] text-slate-500">Why this plan</p>
+                <p className="text-sm leading-7 text-slate-700">{run.execution_plan?.explanation ?? "No explanation available."}</p>
+              </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-sm leading-7 text-slate-700">{run.execution_plan?.summary ?? "No summary available."}</p>
               </div>
@@ -1261,34 +1169,11 @@ function ReportScreen({ route, onBack }: { route: Extract<Route, { page: "report
   );
 }
 
-function buildRubricLines(value: unknown) {
-  const rubric = asRecord(value);
-  if (!rubric) {
-    return ["Checks are not available yet."];
-  }
-
-  const lines: string[] = [];
-  if (typeof rubric.score === "number") {
-    lines.push(`Quality score: ${rubric.score}/100.`);
-  }
-  if (typeof rubric.passed === "boolean") {
-    lines.push(rubric.passed ? "This step passed its quality checks." : "This step still has quality concerns.");
-  }
-  const unmet = asStringArray(rubric.unmet_criteria);
-  if (unmet.length > 0) {
-    lines.push(`Open issues: ${unmet.join(", ")}.`);
-  }
-  if (typeof rubric.notes === "string" && rubric.notes.trim()) {
-    lines.push(`Notes: ${rubric.notes}`);
-  }
-  return lines.length > 0 ? lines : ["Checks are not available yet."];
-}
-
 function NarrativePanel({ title, lines }: { title: string; lines: string[] }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
       <p className="mb-3 text-sm font-medium text-slate-900">{title}</p>
-      <div className="space-y-2 text-sm leading-7 text-slate-700">
+      <div className="max-h-64 overflow-y-auto space-y-2 pr-1 text-sm leading-7 text-slate-700">
         {lines.map((line) => (
           <p key={line}>{line}</p>
         ))}

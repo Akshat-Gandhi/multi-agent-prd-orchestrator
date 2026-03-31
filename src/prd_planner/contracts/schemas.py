@@ -57,17 +57,39 @@ class RunRequest(BaseModel):
 
 
 class Milestone(BaseModel):
-    name: str
-    description: str
-    owner: str
-    eta_days: int = Field(ge=1)
+    name: str = Field(description="Short milestone name that is easy for a stakeholder to scan.")
+    description: str = Field(description="What will be delivered or achieved in this milestone.")
+    owner: str = Field(description="Primary owner or role responsible for driving this milestone.")
+    eta_days: int = Field(ge=1, description="Estimated number of days needed to complete this milestone.")
 
 
 class ExecutionPlan(BaseModel):
-    summary: str
-    milestones: list[Milestone]
-    risks: list[str] = Field(default_factory=list)
-    dependencies: list[str] = Field(default_factory=list)
+    intent: str = Field(
+        description="One sentence in plain language that explains the core purpose of the plan and what it is trying to achieve for the user."
+    )
+    explanation: str = Field(
+        description="A short, first-person explanation for the end user describing why this plan makes sense given the PRD, constraints, and findings."
+    )
+    summary: str = Field(
+        description="A concise overview of the recommended approach, written for a non-technical stakeholder."
+    )
+    milestones: list[Milestone] = Field(
+        description="Ordered milestones that show how the work should progress from start to finish."
+    )
+    risks: list[str] = Field(
+        default_factory=list,
+        description="Meaningful risks, tradeoffs, or uncertainties the user should know about before acting on the plan.",
+    )
+    dependencies: list[str] = Field(
+        default_factory=list,
+        description="External inputs, approvals, tools, integrations, or assumptions required for the plan to succeed.",
+    )
+
+
+class AgentUserPreview(BaseModel):
+    one_liner: str = Field(
+        description="A single first-person sentence for the end user that explains what this agent just did and why it matters."
+    )
 
 
 class RunResponse(BaseModel):

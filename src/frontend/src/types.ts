@@ -14,6 +14,8 @@ export interface Milestone {
 }
 
 export interface ExecutionPlan {
+  intent: string;
+  explanation: string;
   summary: string;
   milestones: Milestone[];
   risks: string[];

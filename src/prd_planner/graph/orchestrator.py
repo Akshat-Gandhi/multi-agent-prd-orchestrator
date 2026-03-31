@@ -45,11 +45,33 @@ class Orchestrator:
     ) -> None:
         self.store = store
         self.model_registry = model_registry or ModelRegistry()
-        self.agents = agents or build_default_agents()
+        self.agents = agents or build_default_agents(self.model_registry)
         self.debug_llm_trace = os.getenv("DEBUG_LLM_TRACE", "false").lower() == "true"
         self.llm_trace_preview_chars = int(os.getenv("LLM_TRACE_PREVIEW_CHARS", "180"))
 
+    def _build_user_preview(self, step: str, data: dict[str, Any] | None = None) -> str:
+        payload = (data or {}).get("payload", {}) if isinstance(data, dict) else {}
+        if step == "ingest_prd":
+            return "I started by reading your brief and identifying the main problem, audience, and goals."
+        if step == "plan_research_tasks":
+            return "I broke your request into smaller research tasks so each step could focus on a specific question."
+        if step == "market_agent":
+            return str(payload.get("user_preview") or "I reviewed the market to understand demand, trends, and where this idea fits.")
+        if step == "competitor_agent":
+            return str(payload.get("user_preview") or "I compared similar products so you can quickly understand the competitive landscape.")
+        if step == "browser_agent":
+            return str(payload.get("user_preview") or "I checked public sources to confirm details and gather supporting evidence.")
+        if step == "synthesize_plan":
+            return "I combined the findings from each step into a single recommendation you can act on."
+        if step == "quality_gate":
+            return "I checked the overall quality of the research to make sure the final recommendation is trustworthy."
+        if step == "finalize":
+            return "I packaged everything into the final plan so it is ready to review."
+        return "I completed this step."
+
     def _persist_event(self, state: OrchestratorState, agent_id: str, step: str, event_type: str, message: str, data: dict[str, Any] | None = None) -> None:
+        event_data = dict(data or {})
+        event_data.setdefault("user_preview", self._build_user_preview(step, event_data))
         event = EventRecord(
             run_id=state.run.run_id,
             trace_id=state.run.trace_id,
@@ -57,7 +79,7 @@ class Orchestrator:
             step=step,
             event_type=event_type,
             message=message,
-            data=data or {},
+            data=event_data,
         )
         self.store.save_event(event)
         log_event(event.model_dump())
@@ -264,12 +286,15 @@ class Orchestrator:
             "Return output using this exact formatting instruction:\n"
             f"{format_instructions}\n\n"
             "CRITICAL: Return a JSON INSTANCE, not a JSON schema.\n"
-            "Your JSON MUST include these top-level keys only: summary, milestones, risks, dependencies.\n"
+            "Your JSON MUST include these top-level keys only: intent, explanation, summary, milestones, risks, dependencies.\n"
             "Do NOT output keys like: $defs, properties, required, title, type, items.\n"
+            "intent must explain in one sentence what this product or plan is fundamentally trying to achieve.\n"
+            "explanation must explain in plain language, in first person, why this plan makes sense for the user's request.\n"
+            "summary should be a concise non-technical overview that a stakeholder can read quickly.\n"
             "milestones must be an array of objects with keys: name, description, owner, eta_days.\n"
             "eta_days must be an integer >= 1.\n"
             "Example valid shape:\n"
-            "{\"summary\":\"...\",\"milestones\":[{\"name\":\"...\",\"description\":\"...\",\"owner\":\"...\",\"eta_days\":7}],\"risks\":[\"...\"],\"dependencies\":[\"...\"]}\n\n"
+            "{\"intent\":\"...\",\"explanation\":\"...\",\"summary\":\"...\",\"milestones\":[{\"name\":\"...\",\"description\":\"...\",\"owner\":\"...\",\"eta_days\":7}],\"risks\":[\"...\"],\"dependencies\":[\"...\"]}\n\n"
             f"PRD:\n{state.run.request.prd_text}\n\n"
             f"Domain: {state.run.request.domain or 'general'}\n"
             f"Constraints: {state.run.request.constraints}\n\n"
